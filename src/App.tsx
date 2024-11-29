@@ -50,6 +50,11 @@ const MovesCount = styled.p`
   color: #4b5563;
 `;
 
+const HighScore = styled.p`
+  font-size: 1.125rem;
+  color: #10b981;
+`;
+
 const Button = styled.button`
   margin-top: 0.5rem;
   padding: 0.5rem 1rem;
@@ -121,13 +126,26 @@ const PexesoGame: React.FC = () => {
     const [solved, setSolved] = useState<SolvedCards>([]);
     const [disabled, setDisabled] = useState<boolean>(false);
     const [moves, setMoves] = useState<number>(0);
+    const [highScore, setHighScore] = useState<number | null>(null);
 
     useEffect(() => {
         const shuffledCards: Cards = [...CARDS]
             .sort(() => Math.random() - 0.5)
             .map((card, index) => ({ id: index, content: card }));
         setCards(shuffledCards);
+
+        const storedHighScore = localStorage.getItem('highScore');
+        if (storedHighScore) {
+            setHighScore(parseInt(storedHighScore, 10));
+        }
     }, []);
+
+    useEffect(() => {
+        if (solved.length === cards.length && (highScore === null || moves < highScore)) {
+            setHighScore(moves);
+            localStorage.setItem('highScore', moves.toString());
+        }
+    }, [solved, cards, moves, highScore]);
 
     const handleClick = (id: number): void => {
         if (disabled || flipped.includes(id) || solved.includes(id)) return;
@@ -150,6 +168,8 @@ const PexesoGame: React.FC = () => {
                     setDisabled(false);
                 }, 1000);
             }
+        } else if (newFlipped.length > 2) {
+            setFlipped([id]);
         }
     };
 
@@ -170,6 +190,7 @@ const PexesoGame: React.FC = () => {
                 <Title>Pexeso Game</Title>
                 <GameStats>
                     <MovesCount>Moves: {moves}</MovesCount>
+                    {highScore !== null && <HighScore>High Score: {highScore}</HighScore>}
                     <Button onClick={resetGame}>
                         New Game
                     </Button>
