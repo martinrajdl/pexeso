@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { Sun, Moon } from 'lucide-react'; // Add this import
+import { useLocalStorage } from '@uidotdev/usehooks';
 
 interface Card {
     id: number;
@@ -15,13 +17,15 @@ interface CardProps {
     $isDisabled: boolean;
 }
 
-const GameContainer = styled.div`
+const GameContainer = styled.div<{ darkMode: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh; 
   width: 100vw;
+  background-color: ${props => props.darkMode ? '#1f2937' : 'white'};
+  color: ${props => props.darkMode ? 'white' : '#1f2937'};
 `;
 
 const Header = styled.div`
@@ -33,11 +37,13 @@ const Header = styled.div`
   width: 100%;
 `;
 
-const Title = styled.h1`
+const Title = styled.h1<{ darkMode: boolean }>`
   font-size: 2rem;
   font-weight: bold;
-  color: #1f2937;
+  color: ${props => props.darkMode ? 'white' : '#1f2937'}; // Update this line
   margin-bottom: 0.5rem;
+  display: flex; 
+  align-items: center ;
 `;
 
 const GameStats = styled.div`
@@ -55,10 +61,10 @@ const HighScore = styled.p`
   color: #10b981;
 `;
 
-const Button = styled.button`
+const Button = styled.button<{ darkMode?: boolean }>`
   margin-top: 0.5rem;
   padding: 0.5rem 1rem;
-  background-color: #3b82f6;
+  background-color: ${props => props.darkMode ? '#2563eb' : '#3b82f6'};
   color: white;
   border: none;
   border-radius: 0.25rem;
@@ -66,13 +72,24 @@ const Button = styled.button`
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: #2563eb;
+    background-color: ${props => props.darkMode ? '#1d4ed8' : '#2563eb'};
   }
+`;
+
+const IconButton = styled.button<{ darkMode: boolean }>` // Update this styled component
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${props => props.darkMode ? 'white' : '#1f2937'};
+  font-size: 1.5rem;
 `;
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 1rem;
 `;
 
@@ -84,13 +101,13 @@ const CardContainer = styled.div<CardProps>`
   justify-content: center;
   cursor: ${props => props.$isDisabled ? 'default' : 'pointer'};
   transform: ${props => props.$isFlipped ? 'rotateY(0)' : 'rotateY(180deg)'};
-  transition: transform 0.3s;
+  transition: transform 0.3s, box-shadow 0.3s;
   background-color: ${props => props.$isFlipped ? 'white' : '#3b82f6'};
   border-radius: 0.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 
   &:hover {
-    transform: ${props => props.$isDisabled ? 'none' : props.$isFlipped ? 'rotateY(0) scale(1.05)' : 'rotateY(180deg) scale(1.05)'};
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
   }
 `;
 
@@ -109,15 +126,30 @@ const WinText = styled.h2`
   color: #059669;
 `;
 
+const AvailableImages = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 1rem;
+  max-width: 520px;
+`;
+
+const ImageContainer = styled.div`
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.25rem;
+  background-color: #f3f4f6;
+  border-radius: 0.25rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+`;
+
 const CARDS: string[] = [
-    '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼',
-    '🦁', '🐸', '🐒', '🦉', '🦄', '🐝', '🐢', '🦋',
-    '🐬', '🐠', '🦈', '🐙', '🦜', '🦩', '🦒', '🦘',
-    '🦡', '🦦', '🦥', '🦨', '🦌', '🦃', '🦚', '🦢',
-    '🦫', '🦏', '🐘', '🦛', '🦭', '🐪', '🐫', '🦒',
-    '🦘', '🦬', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏',
-    '🐑', '🦙', '🐶', '🐱', '🐭', '🐹', '🐰', '🦊',
-    '🐻', '🐼', '🦁', '🐸', '🐒', '🦉', '🦄', '🐝'
+    '🐶', '🐱', '🐘', '🐰', '🦊', '🦦',
+    '🐻', '🐼', '🦁', '🐸', '🐒', '🦉',
+    '🦄', '🐝', '🐢', '🦋', '🐬', '🐠'
 ];
 
 const PexesoGame: React.FC = () => {
@@ -126,26 +158,25 @@ const PexesoGame: React.FC = () => {
     const [solved, setSolved] = useState<SolvedCards>([]);
     const [disabled, setDisabled] = useState<boolean>(false);
     const [moves, setMoves] = useState<number>(0);
-    const [highScore, setHighScore] = useState<number | null>(null);
+    const [highScore, setHighScore] = useLocalStorage<number | null>("highScore", null);
+
+    const [darkMode, setDarkMode] = useState<boolean>(false);
 
     useEffect(() => {
-        const shuffledCards: Cards = [...CARDS]
+        const shuffledCards: Cards = [...CARDS, ...CARDS]
             .sort(() => Math.random() - 0.5)
             .map((card, index) => ({ id: index, content: card }));
         setCards(shuffledCards);
 
-        const storedHighScore = localStorage.getItem('highScore');
-        if (storedHighScore) {
-            setHighScore(parseInt(storedHighScore, 10));
-        }
     }, []);
 
     useEffect(() => {
-        if (solved.length === cards.length && (highScore === null || moves < highScore)) {
-            setHighScore(moves);
-            localStorage.setItem('highScore', moves.toString());
+        if (solved.length === cards.length && cards.length > 0) {
+            if (highScore === null || moves < highScore) {
+                setHighScore(moves);
+            }
         }
-    }, [solved, cards, moves, highScore]);
+    }, [solved, cards, moves, highScore, setHighScore]);
 
     const handleClick = (id: number): void => {
         if (disabled || flipped.includes(id) || solved.includes(id)) return;
@@ -174,7 +205,7 @@ const PexesoGame: React.FC = () => {
     };
 
     const resetGame = (): void => {
-        const shuffledCards: Cards = [...CARDS]
+        const shuffledCards: Cards = [...CARDS, ...CARDS]
             .sort(() => Math.random() - 0.5)
             .map((card, index) => ({ id: index, content: card }));
         setCards(shuffledCards);
@@ -184,14 +215,31 @@ const PexesoGame: React.FC = () => {
         setDisabled(false);
     };
 
+    const toggleDarkMode = (): void => {
+        setDarkMode(prevMode => !prevMode);
+    };
+
     return (
-        <GameContainer>
+        <GameContainer darkMode={darkMode}>
             <Header>
-                <Title>Pexeso Game</Title>
+                <Title darkMode={darkMode}>
+                    Pexeso Game
+                    <IconButton onClick={toggleDarkMode} darkMode={darkMode}>
+                        {darkMode ? <Sun /> : <Moon />}
+                    </IconButton>
+                </Title> {/* Pass darkMode prop */}
+
+                <AvailableImages>
+                    {CARDS.map((image, index) => (
+                        <ImageContainer key={index}>
+                            {image}
+                        </ImageContainer>
+                    ))}
+                </AvailableImages>
                 <GameStats>
                     <MovesCount>Moves: {moves}</MovesCount>
                     {highScore !== null && <HighScore>High Score: {highScore}</HighScore>}
-                    <Button onClick={resetGame}>
+                    <Button onClick={resetGame} darkMode={darkMode}>
                         New Game
                     </Button>
                 </GameStats>
